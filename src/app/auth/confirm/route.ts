@@ -1,8 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { env } from "@/lib/env";
 
-/** token_hash verification (used by customised Supabase email templates). */
+/** token_hash verification (used by customised Supabase email templates). Redirects use the public app URL. */
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const tokenHash = url.searchParams.get("token_hash");
@@ -12,7 +13,7 @@ export async function GET(request: NextRequest) {
   if (tokenHash && type) {
     const supabase = await createClient();
     const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
-    if (!error) return NextResponse.redirect(new URL(type === "recovery" ? "/reset-password" : next, url.origin));
+    if (!error) return NextResponse.redirect(`${env.appUrl}${type === "recovery" ? "/reset-password" : next}`);
   }
-  return NextResponse.redirect(new URL("/login?error=link_expired", url.origin));
+  return NextResponse.redirect(`${env.appUrl}/login?error=link_expired`);
 }

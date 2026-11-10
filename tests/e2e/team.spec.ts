@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
-import { resetSignupLimit, signUpAgency } from "./helpers";
+import { confirmEmailIfRequired, resetSignupLimit, signUpAgency } from "./helpers";
 
 test("owner invites a teammate who signs up, joins, gets promoted, then is removed", async ({ page, browser }) => {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -41,6 +41,7 @@ test("owner invites a teammate who signs up, joins, gets promoted, then is remov
   await mate.fill("#fullName", "Taylor Mate");
   await mate.fill("#password", "password123");
   await mate.click("button[type=submit]");
+  await confirmEmailIfRequiredForInvite(mate, mateEmail);
   await mate.waitForURL("**/invite/**");
   await mate.getByRole("button", { name: "Accept invitation" }).click();
   await mate.waitForURL("**/dashboard**");
@@ -92,3 +93,12 @@ test("an invite only works for the invited email", async ({ page, browser }) => 
   await other.getByRole("button", { name: "Accept invitation" }).click();
   await expect(other.getByText(/This invitation was sent to/)).toBeVisible();
 });
+
+async function confirmEmailIfRequiredForInvite(page: import("@playwright/test").Page, email: string) {
+  const inbox = page.getByText("Check your inbox");
+  const needs = await Promise.race([
+    page.waitForURL("**/invite/**", { timeout: 15_000 }).then(() => false),
+    inbox.waitFor({ timeout: 15_000 }).then(() => true),
+  ]).catch(() => false);
+  if (needs) await confirmEmailIfRequired(page, email);
+}

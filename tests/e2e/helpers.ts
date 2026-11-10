@@ -17,6 +17,7 @@ export async function signUpAgency(page: Page, opts: { name?: string; workspace?
   await page.fill("#email", email);
   await page.fill("#password", "password123");
   await page.click("button[type=submit]");
+  await confirmEmailIfRequired(page, email);
   await page.waitForURL("**/onboarding");
   await page.fill("#name", opts.workspace ?? `Studio ${Date.now().toString(36)}`);
   await page.click("button[type=submit]");
@@ -37,4 +38,30 @@ export async function createAndSendRequest(page: Page, client = { name: "Jordan 
   const link = await page.locator("input[readonly]").inputValue();
   expect(link).toMatch(/\/p\/[A-Za-z0-9_-]{40,}/);
   return link;
+}
+
+/**
+ * When the server requires email confirmation (production settings), open the
+ * confirmation link from the test inbox (Mailpit API at E2E_MAILPIT_URL).
+ */
+export async function confirmEmailIfRequired(page: Page, email: string) {
+  const inbox = page.getByText("Check your inbox");
+  const needsConfirm = await Promise.race([
+    page.waitForURL("**/onboarding", { timeout: 15_000 }).then(() => false),
+    inbox.waitFor({ timeout: 15_000 }).then(() => true),
+  ]).catch(() => false);
+  if (!needsConfirm) return;
+  const mailpit = process.env.E2E_MAILPIT_URL;
+  if (!mailpit) throw new Error("Server requires email confirmation; set E2E_MAILPIT_URL to read the test inbox");
+  let link: string | undefined;
+  for (let i = 0; i < 30 && !link; i++) {
+    const list = await (await fetch(`${mailpit}/api/v1/search?query=${encodeURIComponent(`to:${email}`)}`)).json();
+    if (list.messages?.length) {
+      const msg = await (await fetch(`${mailpit}/api/v1/message/${list.messages[0].ID}`)).json();
+      link = (msg.HTML as string).match(/href="([^"]+\/verify[^"]+)"/)?.[1]?.replace(/&amp;/g, "&");
+    }
+    if (!link) await new Promise((r) => setTimeout(r, 500));
+  }
+  if (!link) throw new Error(`No confirmation email for ${email}`);
+  await page.goto(link);
 }
