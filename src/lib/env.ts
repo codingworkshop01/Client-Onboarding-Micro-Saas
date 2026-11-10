@@ -23,7 +23,7 @@ export const env = {
   smtpPort: Number(process.env.SMTP_PORT || 587),
   aiProvider: process.env.AI_PROVIDER || "anthropic",
   anthropicApiKey: process.env.ANTHROPIC_API_KEY || "",
-  aiModel: process.env.AI_MODEL || "claude-sonnet-5-5",
+  aiModel: process.env.AI_MODEL || "claude-opus-5-5",
   stripeSecretKey: process.env.STRIPE_SECRET_KEY || "",
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",
   stripePrices: {
