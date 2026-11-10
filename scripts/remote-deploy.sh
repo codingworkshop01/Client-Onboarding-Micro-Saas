@@ -71,7 +71,7 @@ wait_healthy() {
 # ------------------------------------------------------------- database
 if [ "$BOOTSTRAP" = 1 ]; then
   step "Bootstrap: starting database stack (first install only)"
-  mkdir -p "$ROOT/data/db" "$ROOT/data/db-config" "$ROOT/data/storage"
+  mkdir -p "$ROOT/data/db" "$ROOT/data/storage"
   dc up -d db auth rest storage gateway
 fi
 dc ps --status running --services | grep -qx db \

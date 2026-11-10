@@ -37,7 +37,8 @@ services:
       JWT_EXP: 3600
     volumes:
       - ./data/db:/var/lib/postgresql/data
-      - ./data/db-config:/etc/postgresql-custom
+      # Named volume (not a bind mount): it must start with the image's own files.
+      - db-config:/etc/postgresql-custom
       - ./app/deploy/supabase/db/roles.sql:/docker-entrypoint-initdb.d/init-scripts/99-roles.sql:ro
       - ./app/deploy/supabase/db/jwt.sql:/docker-entrypoint-initdb.d/init-scripts/99-jwt.sql:ro
     healthcheck:
@@ -261,6 +262,9 @@ services:
       - |
         echo "5 * * * * wget -qO- -T 120 --header 'Authorization: Bearer $$CRON_SECRET' http://app:3000/api/cron/reminders; echo" > /etc/crontabs/root
         exec crond -f -l 8
+
+volumes:
+  db-config:
 
 networks:
   root_default:
