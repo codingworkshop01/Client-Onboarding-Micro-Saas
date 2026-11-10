@@ -45,9 +45,3 @@ next-env.d.ts
 /playwright-report
 supabase/.temp
 
-# VPS deployment (secrets, Supabase stack, backups)
-deploy/.env.production
-deploy/supabase-stack/
-deploy/backups/
-deploy/docker-compose.override.yml
-!deploy/.env.production.example

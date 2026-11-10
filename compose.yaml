@@ -1,0 +1,267 @@
+# Onboardly on hablu-vps. Lives at /srv/apps/ai-client-onboarding/compose.yaml
+# (copied there from app/compose.yaml by scripts/remote-deploy.sh).
+# Layout next to this file: .env (root 0600, written only by hablu-env),
+# REVISION, app/ (build context), data/ (database + uploaded files).
+#
+# Rules: no published host ports anywhere. Only `app` and `gateway` join Traefik's network.
+# App deploys use `up -d --no-deps app cron`, so db/auth/rest/storage are never
+# recreated by a deploy.
+#
+# Supabase images match the official self-hosting release self-hosted/v0.8.4.
+
+name: hablu-onboarding
+
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "10m", max-file: "3" }
+
+x-public-url: &public_url https://${APP_DOMAIN:?set APP_DOMAIN in .env}
+
+services:
+  db:
+    image: supabase/postgres:17.6.1.136
+    restart: unless-stopped
+    mem_limit: 2g
+    cpus: 2.0
+    stop_grace_period: 60s
+    logging: *logging
+    command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf", "-c", "log_min_messages=fatal"]
+    environment:
+      POSTGRES_HOST: /var/run/postgresql
+      PGPORT: 5432
+      POSTGRES_PORT: 5432
+      PGDATABASE: postgres
+      POSTGRES_DB: postgres
+      PGPASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      JWT_EXP: 3600
+    volumes:
+      - ./data/db:/var/lib/postgresql/data
+      - ./data/db-config:/etc/postgresql-custom
+      - ./app/deploy/supabase/db/roles.sql:/docker-entrypoint-initdb.d/init-scripts/99-roles.sql:ro
+      - ./app/deploy/supabase/db/jwt.sql:/docker-entrypoint-initdb.d/init-scripts/99-jwt.sql:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  auth:
+    image: supabase/gotrue:v2.197.0
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.5
+    stop_grace_period: 20s
+    logging: *logging
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: https://${APP_DOMAIN}/auth/v1
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db:5432/postgres
+      GOTRUE_SITE_URL: *public_url
+      GOTRUE_URI_ALLOW_LIST: https://${APP_DOMAIN}/**
+      GOTRUE_DISABLE_SIGNUP: "false"
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_EXP: 3600
+      GOTRUE_JWT_SECRET: ${JWT_SECRET:?}
+      GOTRUE_JWT_ISSUER: https://${APP_DOMAIN}/auth/v1
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED: "false"
+      GOTRUE_EXTERNAL_PHONE_ENABLED: "false"
+      GOTRUE_MAILER_AUTOCONFIRM: "false"
+      GOTRUE_SMTP_ADMIN_EMAIL: ${SMTP_ADMIN_EMAIL:?}
+      GOTRUE_SMTP_HOST: ${SMTP_HOST:?}
+      GOTRUE_SMTP_PORT: ${SMTP_PORT:?}
+      GOTRUE_SMTP_USER: ${SMTP_USER:-}
+      GOTRUE_SMTP_PASS: ${SMTP_PASS:-}
+      GOTRUE_SMTP_SENDER_NAME: ${SMTP_SENDER_NAME:-Onboardly}
+      GOTRUE_MAILER_URLPATHS_INVITE: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_CONFIRMATION: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_RECOVERY: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE: /auth/v1/verify
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9999/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rest:
+    image: postgrest/postgrest:v14.18
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.5
+    stop_grace_period: 20s
+    logging: *logging
+    depends_on:
+      db: { condition: service_healthy }
+    command: ["postgrest"]
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@db:5432/postgres
+      PGRST_DB_SCHEMAS: public,storage,graphql_public
+      PGRST_DB_MAX_ROWS: 1000
+      PGRST_DB_EXTRA_SEARCH_PATH: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+      PGRST_APP_SETTINGS_JWT_EXP: 3600
+      PGRST_ADMIN_SERVER_PORT: 3001
+      PGRST_ADMIN_SERVER_HOST: localhost
+    healthcheck:
+      test: ["CMD", "postgrest", "--ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  storage:
+    image: supabase/storage-api:v1.89.12
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: 1.0
+    stop_grace_period: 30s
+    logging: *logging
+    depends_on:
+      db: { condition: service_healthy }
+      rest: { condition: service_started }
+    environment:
+      ANON_KEY: ${ANON_KEY:?}
+      SERVICE_KEY: ${SERVICE_ROLE_KEY:?}
+      POSTGREST_URL: http://rest:3000
+      AUTH_JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@db:5432/postgres
+      STORAGE_PUBLIC_URL: *public_url
+      REQUEST_ALLOW_X_FORWARDED_PATH: "true"
+      FILE_SIZE_LIMIT: 52428800
+      STORAGE_BACKEND: file
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      GLOBAL_S3_BUCKET: stub
+      TENANT_ID: stub
+      REGION: stub
+      ENABLE_IMAGE_TRANSFORMATION: "false"
+    volumes:
+      - ./data/storage:/var/lib/storage
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://storage:5000/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Official Supabase API gateway (Envoy). Traefik sends only the three API
+  # path prefixes here; Studio/meta routes it knows about have no backend.
+  gateway:
+    image: envoyproxy/envoy:v1.39.6
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.5
+    stop_grace_period: 10s
+    logging: *logging
+    depends_on:
+      auth: { condition: service_healthy }
+      rest: { condition: service_started }
+      storage: { condition: service_healthy }
+    entrypoint: ["/bin/sh", "/docker-entrypoint.sh"]
+    environment:
+      ANON_KEY: ${ANON_KEY}
+      SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
+      SUPABASE_PUBLIC_URL: *public_url
+      SUPABASE_PUBLISHABLE_KEY: ""
+      SUPABASE_SECRET_KEY: ""
+      ANON_KEY_ASYMMETRIC: ""
+      SERVICE_ROLE_KEY_ASYMMETRIC: ""
+      DASHBOARD_USERNAME: disabled
+      DASHBOARD_PASSWORD: disabled
+    volumes:
+      - ./app/deploy/supabase/envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro
+      - ./app/deploy/supabase/envoy/cds.yaml:/etc/envoy/cds.yaml:ro
+      - ./app/deploy/supabase/envoy/lds.template.yaml:/etc/envoy/lds.template.yaml:ro
+      - ./app/deploy/supabase/envoy/docker-entrypoint.sh:/docker-entrypoint.sh:ro
+    networks:
+      default:
+        aliases: [kong, envoy]
+      root_default: {}
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=root_default
+      - traefik.http.routers.hablu-onboarding-api.rule=Host(`${APP_DOMAIN}`) && (PathPrefix(`/auth/v1`) || PathPrefix(`/rest/v1`) || PathPrefix(`/storage/v1`))
+      - traefik.http.routers.hablu-onboarding-api.priority=100
+      - traefik.http.routers.hablu-onboarding-api.entrypoints=websecure
+      - traefik.http.routers.hablu-onboarding-api.tls.certresolver=mytlschallenge
+      - traefik.http.routers.hablu-onboarding-api.service=hablu-onboarding-api
+      - traefik.http.services.hablu-onboarding-api.loadbalancer.server.port=8000
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 1 bash -c '</dev/tcp/127.0.0.1/8000'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: ./app
+      args:
+        REVISION: ${REVISION:-current}
+        NEXT_PUBLIC_APP_URL: *public_url
+        NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-Onboardly}
+        NEXT_PUBLIC_SUPABASE_URL: *public_url
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${ANON_KEY}
+    image: hablu-onboarding-app:${REVISION:-current}
+    restart: unless-stopped
+    mem_limit: 1g
+    cpus: 2.0
+    stop_grace_period: 30s
+    logging: *logging
+    environment:
+      NEXT_PUBLIC_APP_URL: *public_url
+      NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-Onboardly}
+      NEXT_PUBLIC_SUPABASE_URL: *public_url
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
+      CRON_SECRET: ${CRON_SECRET:?}
+      EMAIL_FROM: ${EMAIL_FROM:?}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-claude-opus-5-5}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_PRICE_SOLO: ${STRIPE_PRICE_SOLO:-}
+      STRIPE_PRICE_AGENCY: ${STRIPE_PRICE_AGENCY:-}
+      STRIPE_PRICE_SCALE: ${STRIPE_PRICE_SCALE:-}
+    networks:
+      default: {}
+      root_default: {}
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=root_default
+      - traefik.http.routers.hablu-onboarding.rule=Host(`${APP_DOMAIN}`)
+      - traefik.http.routers.hablu-onboarding.entrypoints=websecure
+      - traefik.http.routers.hablu-onboarding.tls.certresolver=mytlschallenge
+      - traefik.http.routers.hablu-onboarding.service=hablu-onboarding
+      - traefik.http.services.hablu-onboarding.loadbalancer.server.port=3000
+
+  # Hourly automatic reminders (calls the app over the internal network).
+  cron:
+    image: alpine:3.20
+    restart: unless-stopped
+    mem_limit: 32m
+    cpus: 0.1
+    stop_grace_period: 5s
+    logging: *logging
+    environment:
+      CRON_SECRET: ${CRON_SECRET}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "5 * * * * wget -qO- -T 120 --header 'Authorization: Bearer $$CRON_SECRET' http://app:3000/api/cron/reminders; echo" > /etc/crontabs/root
+        exec crond -f -l 8
+
+networks:
+  root_default:
+    external: true
