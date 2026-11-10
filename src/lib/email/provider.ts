@@ -32,7 +32,12 @@ export async function sendEmail(email: OutgoingEmail): Promise<SendResult> {
       return { status: "sent", provider, messageId: data?.id };
     }
     const nodemailer = await import("nodemailer");
-    const transport = nodemailer.createTransport({ host: env.smtpHost, port: env.smtpPort, secure: env.smtpPort === 465 });
+    const transport = nodemailer.createTransport({
+      host: env.smtpHost,
+      port: env.smtpPort,
+      secure: env.smtpPort === 465,
+      auth: env.smtpUser ? { user: env.smtpUser, pass: env.smtpPass } : undefined,
+    });
     const info = await transport.sendMail({
       from: env.emailFrom,
       to: email.to,

@@ -2,9 +2,18 @@ import "server-only";
 import { headers } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+/**
+ * Client IP for rate limiting. Prefer X-Real-IP, which the reverse proxy
+ * (Traefik / Nginx Proxy Manager / Vercel) sets itself. The first
+ * X-Forwarded-For entry can be supplied by the client, so it's only a
+ * fallback; we take the entry nearest the proxy (the last one) instead.
+ */
 export async function clientIp() {
   const h = await headers();
-  return h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown";
+  const realIp = h.get("x-real-ip")?.trim();
+  if (realIp) return realIp;
+  const forwarded = h.get("x-forwarded-for")?.split(",").map((s) => s.trim()).filter(Boolean);
+  return forwarded?.at(-1) || "unknown";
 }
 
 /**

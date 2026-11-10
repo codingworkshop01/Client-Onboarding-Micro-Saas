@@ -21,6 +21,8 @@ export const env = {
   emailFrom: process.env.EMAIL_FROM || "Onboardly <onboarding@example.com>",
   smtpHost: process.env.SMTP_HOST || "",
   smtpPort: Number(process.env.SMTP_PORT || 587),
+  smtpUser: process.env.SMTP_USER || "",
+  smtpPass: process.env.SMTP_PASS || "",
   aiProvider: process.env.AI_PROVIDER || "anthropic",
   anthropicApiKey: process.env.ANTHROPIC_API_KEY || "",
   aiModel: process.env.AI_MODEL || "claude-opus-5-5",

@@ -1,0 +1,13 @@
+.git
+.next
+node_modules
+.env*
+!.env.example
+deploy/.env.production
+deploy/supabase-stack
+deploy/backups
+test-results
+playwright-report
+tests
+supabase/.temp
+*.log

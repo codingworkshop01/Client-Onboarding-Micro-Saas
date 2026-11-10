@@ -14,7 +14,7 @@ export default defineConfig({
   timeout: 90_000,
   fullyParallel: false,
   workers: 1,
-  use: { baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000", trace: "off" },
+  use: { baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000", trace: "off", ignoreHTTPSErrors: process.env.E2E_IGNORE_HTTPS_ERRORS === "1" },
   webServer: process.env.E2E_BASE_URL ? undefined : { command: "pnpm dev", url: "http://localhost:3000/login", reuseExistingServer: true, timeout: 120_000 },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"], launchOptions: executablePath ? { executablePath } : undefined } }],
 });
