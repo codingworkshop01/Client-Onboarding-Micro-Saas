@@ -56,6 +56,11 @@ mv "$ROOT/app.new" "$ROOT/app"
 [ -f "$ROOT/compose.yaml" ] && cp -p "$ROOT/compose.yaml" "$ROOT/compose.yaml.prev"
 mv "$ROOT/compose.yaml.new" "$ROOT/compose.yaml"
 ok "app/ updated (previous in app.prev/), compose config -q passed"
+# Install the backup script outside app/, so a rollback to a commit without it keeps the nightly job working.
+if [ -f "$ROOT/app/scripts/backup.sh" ]; then
+  install -m 700 -o root -g root "$ROOT/app/scripts/backup.sh" "$ROOT/backup.sh"
+  ok "backup.sh installed at $ROOT/backup.sh"
+fi
 
 wait_healthy() {
   local svc="$1" timeout="${2:-180}" waited=0 cid status
