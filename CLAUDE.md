@@ -115,7 +115,9 @@ uploads files, grants account access, signs an agreement and pays.
   `branding`, on disk in `data/storage`) all worked.
 - **Note:** `hablu-env set/add onboarding ...` recreates only `app`. GoTrue (`auth`) also reads `SMTP_*`, so after
   changing those run `docker compose -p hablu-onboarding up -d --no-deps auth` in the install dir.
-- **UNVERIFIED:** rollback on the real host (done in the sandbox only); DB backups (not implemented).
+- **Rollback verified on the real host (2026-11-10):** `-Sha a16811b` then `-Sha e398e3c`, 11-12 s each;
+  image reused (no build), 0 migrations, only `app` recreated; user, workspace and file intact.
+- **UNVERIFIED / missing:** DB + storage backups (not implemented).
 
 ## 7. Next steps (owner runs host commands; verify each with real output)
 1. Optional: set `GOTRUE_MAILER_EXTERNAL_HOSTS` to silence a repeated info line in the `auth` logs.
