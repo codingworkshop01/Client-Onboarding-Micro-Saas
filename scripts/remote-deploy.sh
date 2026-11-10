@@ -117,7 +117,8 @@ case "$version" in *"\"$SHA\""*) ok "/api/version = $version";; *) die "/api/ver
 dc exec -T app wget -qO- http://127.0.0.1:3000/healthz >/dev/null && ok "/healthz 200"
 
 # Keep the 5 newest app images (+ current); remove older tags of THIS image only.
-docker images "$IMAGE" --format '{{.Tag}}' | grep -Ev "^(current|$SHA)$" | tail -n +5 | while read -r tag; do
+# `|| true`: with no older images grep matches nothing (exit 1), which pipefail would turn into a failed deploy.
+docker images "$IMAGE" --format '{{.Tag}}' | { grep -Ev "^(current|$SHA)$" || true; } | tail -n +5 | while read -r tag; do
   docker image rm "$IMAGE:$tag" >/dev/null 2>&1 && echo "    removed old image $IMAGE:$tag" || true
 done
 rm -f "$TARBALL"
