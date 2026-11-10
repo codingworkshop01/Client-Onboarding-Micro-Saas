@@ -27,8 +27,10 @@ RUN test -n "$NEXT_PUBLIC_SUPABASE_URL" && test -n "$NEXT_PUBLIC_SUPABASE_ANON_K
 RUN pnpm build
 
 FROM node:22-alpine AS runner
+ARG REVISION=unknown
 WORKDIR /app
-ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0 APP_REVISION=$REVISION
+LABEL org.opencontainers.image.revision=$REVISION
 RUN addgroup -S app -g 1001 && adduser -S app -u 1001 -G app
 COPY --from=build --chown=app:app /app/.next/standalone ./
 COPY --from=build --chown=app:app /app/.next/static ./.next/static
@@ -36,5 +38,5 @@ COPY --from=build --chown=app:app /app/public ./public
 USER app
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-  CMD wget -qO- http://127.0.0.1:3000/api/health >/dev/null || exit 1
+  CMD wget -qO- http://127.0.0.1:3000/healthz >/dev/null || exit 1
 CMD ["node", "server.js"]

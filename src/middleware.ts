@@ -7,5 +7,5 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   // Skip static assets, the public client portal, webhooks and cron.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|p/|api/webhooks|api/cron|api/portal|api/health|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|p/|api/webhooks|api/cron|api/portal|api/health|api/version|healthz|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
 };

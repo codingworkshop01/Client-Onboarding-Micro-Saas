@@ -3,11 +3,11 @@
 node_modules
 .env*
 !.env.example
-deploy/.env.production
-deploy/supabase-stack
-deploy/backups
+tests
 test-results
 playwright-report
-tests
+ops
+deploy/supabase-stack
+deploy/backups
 supabase/.temp
 *.log
