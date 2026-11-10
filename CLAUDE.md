@@ -139,7 +139,7 @@ uploads files, grants account access, signs an agreement and pays.
   chooses); the OPS-file changes are made locally but not deployed.
 
 ## 7. Next steps (owner runs host commands; verify each with real output)
-1. Owner: deploy the OPS host layer from `D:\codes\work\hablu\hablu-programmer\opsps-panel`
+1. Owner: deploy the OPS host layer from `D:\codes\work\hablu\hablu-programmer\ops\vps-panel`
    (`pwsh -File .\deploy.ps1 -HostLayer`). Changed on 2026-11-10 (originals in `.orig-2026-11-10/`):
    - `host/hablu-env.conf`: `onboarding` line with `companion=auth` (without it, install-host.sh would drop the line);
    - `host/hablu-env`: doctor `find` roots include `/srv/apps`; selftest expects 7 projects;
