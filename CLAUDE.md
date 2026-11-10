@@ -109,18 +109,19 @@ uploads files, grants account access, signs an agreement and pays.
   - `ops/deploy.ps1` works on Windows (pwsh 7.6).
 - **Bug fixed on the real host:** `remote-deploy.sh` image cleanup failed with pipefail when there were no
   old images (first install); fixed in e398e3c.
-- **UNVERIFIED:** real SMTP delivery (`.env` has `SMTP_PASS` but no `SMTP_USER`); sign-up flow on the real
-  host; rollback on the real host (done in the sandbox only); DB backups (not implemented).
+- **Verified on the real host, email and app flow (2026-11-10):** hablu-env allowlist line added (`onboarding`,
+  line 25 of `/etc/hablu-env.conf`); SMTP is Gmail `smtp.gmail.com:465` (login accepted); real sign-up ->
+  confirmation email -> confirm -> password-reset email -> sign-in -> workspace -> file upload (bucket
+  `branding`, on disk in `data/storage`) all worked.
+- **Note:** `hablu-env set/add onboarding ...` recreates only `app`. GoTrue (`auth`) also reads `SMTP_*`, so after
+  changing those run `docker compose -p hablu-onboarding up -d --no-deps auth` in the install dir.
+- **UNVERIFIED:** rollback on the real host (done in the sandbox only); DB backups (not implemented).
 
 ## 7. Next steps (owner runs host commands; verify each with real output)
-1. Owner: add this hablu-env allowlist line in the OPS repo (`/etc/hablu-env.conf`), so `.env` can be edited:
-   `onboarding|/srv/apps/ai-client-onboarding|compose.yaml|app|.env|mode=interp,rebuild=allow`
-   Then `hablu-env set onboarding KEY` changes a value (hidden input, recreates `app`).
-2. Check SMTP: `SMTP_USER` is missing; add it with `hablu-env add onboarding SMTP_USER` if the server needs login,
-   then test a sign-up email.
-3. Later, only when the owner asks, OPS-repo updates for the new root `/srv/apps`:
+1. Optional: set `GOTRUE_MAILER_EXTERNAL_HOSTS` to silence a repeated info line in the `auth` logs.
+2. Later, only when the owner asks, OPS-repo updates for the new root `/srv/apps`:
    - hablu-env doctor/prune `find` roots;
    - hablu-env-uninstall `ENV_DIRS`;
    - hablu-status dir list;
    - config-backup tar path (`.env` and `compose.yaml`).
-4. Later: DB + storage backups (`pg_dump` as `supabase_admin`, plus a tar of `data/storage`).
+3. Later: DB + storage backups (`pg_dump` as `supabase_admin`, plus a tar of `data/storage`).
