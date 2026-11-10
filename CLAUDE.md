@@ -93,7 +93,7 @@ uploads files, grants account access, signs an agreement and pays.
   (or `service_role`).
 - **Never change `POSTGRES_PASSWORD` or `JWT_SECRET` after the first bootstrap:** the database is initialised with them.
 
-## 6. Status (LIVE on hablu-vps since 2026-11-10, revision e398e3c6bdab)
+## 6. Status (LIVE on hablu-vps since 2026-11-10, revision 5bb19bbf78b6)
 - **Install:** `/srv/apps/ai-client-onboarding` (+ `/opt` symlink). `.env` was first filled by
   `scripts/init-env.sh` (owner, on the host), because hablu-env cannot write an empty `.env` before the
   first deploy (it runs `compose config` and recreates `app` on every write). From now on: hablu-env only.
@@ -113,17 +113,39 @@ uploads files, grants account access, signs an agreement and pays.
   line 25 of `/etc/hablu-env.conf`); SMTP is Gmail `smtp.gmail.com:465` (login accepted); real sign-up ->
   confirmation email -> confirm -> password-reset email -> sign-in -> workspace -> file upload (bucket
   `branding`, on disk in `data/storage`) all worked.
-- **Note:** `hablu-env set/add onboarding ...` recreates only `app`. GoTrue (`auth`) also reads `SMTP_*`, so after
-  changing those run `docker compose -p hablu-onboarding up -d --no-deps auth` in the install dir.
+- **Note:** the installed `hablu-env` recreates only `app`. GoTrue (`auth`) also reads `SMTP_*`, so after changing
+  those run `docker compose -p hablu-onboarding up -d --no-deps auth` in the install dir. Once the owner deploys the
+  OPS files (section 7), the conf line has `companion=auth` and hablu-env recreates `app` + `auth` itself.
 - **Rollback verified on the real host (2026-11-10):** `-Sha a16811b` then `-Sha e398e3c`, 11-12 s each;
   image reused (no build), 0 migrations, only `app` recreated; user, workspace and file intact.
-- **UNVERIFIED / missing:** DB + storage backups (not implemented).
+- **`GOTRUE_MAILER_EXTERNAL_HOSTS=${APP_DOMAIN}`** (5bb19bb): auth's repeated "external host not added" log line is gone.
+- **Backups (5bb19bb, verified 2026-11-10):**
+  - `scripts/backup.sh` -> installed by every deploy as `/srv/apps/ai-client-onboarding/backup.sh` (0700);
+    cron `/etc/cron.d/hablu-onboarding-backup`, daily 22:00 UTC, log `backups/backup.log`, keeps 14 days.
+  - Each run writes to `backups/` (0700 dir, 0600 files): `db-<ts>.dump` (`pg_dump -Fc` as `supabase_admin`),
+    `roles-<ts>.sql`, `storage-<ts>.tar.gz` (`data/storage`), `config-<ts>.tar.gz` (`.env`, `compose.yaml`, `REVISION`).
+    `backup.sh --list` lists them. Run time < 1 s today.
+  - Restore rehearsal passed: dump restored into a throwaway `supabase/postgres:17.6.1.136` container; users,
+    workspaces, members, objects, buckets, 54 policies and 3 migrations all matched live.
+  - **Restore (owner decides; stops the app):** in the install dir,
+    1. `docker compose -p hablu-onboarding stop app cron auth rest storage`;
+    2. `docker cp backups/db-<ts>.dump hablu-onboarding-db-1:/tmp/db.dump`, then
+       `docker exec hablu-onboarding-db-1 sh -c 'PGPASSWORD=$POSTGRES_PASSWORD pg_restore -h localhost -U supabase_admin -d postgres --clean --if-exists /tmp/db.dump'`;
+    3. files: `tar -xzf backups/storage-<ts>.tar.gz -C data` (replaces `data/storage`);
+    4. `docker compose -p hablu-onboarding up -d --no-deps auth rest storage app cron`, then check `/healthz`.
+    `roles-<ts>.sql` is only needed on a brand-new server (existing roles error harmlessly).
+  - `hablu-docker-gc` only prunes dangling images, so the tagged rollback images are safe.
+- **UNVERIFIED / missing:** off-server copies of the backups (same disk as the data; needs a destination the owner
+  chooses); the OPS-file changes are made locally but not deployed.
 
 ## 7. Next steps (owner runs host commands; verify each with real output)
-1. Optional: set `GOTRUE_MAILER_EXTERNAL_HOSTS` to silence a repeated info line in the `auth` logs.
-2. Later, only when the owner asks, OPS-repo updates for the new root `/srv/apps`:
-   - hablu-env doctor/prune `find` roots;
-   - hablu-env-uninstall `ENV_DIRS`;
-   - hablu-status dir list;
-   - config-backup tar path (`.env` and `compose.yaml`).
-3. Later: DB + storage backups (`pg_dump` as `supabase_admin`, plus a tar of `data/storage`).
+1. Owner: deploy the OPS host layer from `D:\codes\work\hablu\hablu-programmer\opsps-panel`
+   (`pwsh -File .\deploy.ps1 -HostLayer`). Changed on 2026-11-10 (originals in `.orig-2026-11-10/`):
+   - `host/hablu-env.conf`: `onboarding` line with `companion=auth` (without it, install-host.sh would drop the line);
+   - `host/hablu-env`: doctor `find` roots include `/srv/apps`; selftest expects 7 projects;
+   - `host/hablu-env-uninstall`: `ENV_DIRS` includes `/srv/apps/ai-client-onboarding`;
+   - `host/hablu-status`: compose project list includes `/srv/apps/ai-client-onboarding`.
+   This also installs the OPS repo's newer, not-yet-deployed `hablu-env` (the `companion=` option, used by `support` too).
+   There is no "config-backup" tool anywhere; `.env` + `compose.yaml` are covered by `backup.sh` instead.
+   After deploy: `hablu-env selftest` -> 45 passed, 0 failed (the installed version fails 1 check since the 7th project).
+2. Later: off-server backup copies (S3 / Google Drive / another host), owner's choice of destination.
