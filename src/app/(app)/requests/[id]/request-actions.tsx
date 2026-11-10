@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { deleteRequest, getClientLink, reopenStep, resendInvitation, revokeLinks, sendRequest, setRequestStatus } from "../actions";
+import { deleteRequest, getClientLink, recordOfflinePayment, reopenStep, resendInvitation, revokeLinks, sendRequest, setRequestStatus } from "../actions";
 
 type Status = "draft" | "sent" | "in_progress" | "completed" | "cancelled";
 
@@ -100,5 +100,30 @@ export function ReopenStepButton({ stepId }: { stepId: string }) {
       onClick={() => start(async () => { const r = await reopenStep(stepId); if (!r.ok) toast.error(r.error); else { toast.success("Step reopened"); router.refresh(); } })}>
       <RotateCcw />
     </Button>
+  );
+}
+
+export function RecordPaymentButton({ stepId }: { stepId: string }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState("");
+  const [pending, start] = useTransition();
+  return (
+    <>
+      <Button variant="outline" size="sm" onClick={() => setOpen(true)}>Record offline payment</Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Record an offline payment</DialogTitle>
+            <DialogDescription>Use this when the client paid outside the portal (e.g. bank transfer). It&apos;s marked as recorded by your team, not as a card payment.</DialogDescription>
+          </DialogHeader>
+          <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Reference, e.g. Bank transfer #4821 (optional)" maxLength={200} />
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button loading={pending} onClick={() => start(async () => { const r = await recordOfflinePayment(stepId, note); if (!r.ok) return void toast.error(r.error); toast.success("Payment recorded"); setOpen(false); router.refresh(); })}>Mark as paid</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

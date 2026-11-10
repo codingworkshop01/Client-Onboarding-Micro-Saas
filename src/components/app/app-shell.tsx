@@ -123,7 +123,7 @@ function SidebarContent({ workspace, workspaces, user, role, unreadComments, onS
           <Link href="/requests/new"><Plus />New onboarding</Link>
         </Button>
         {NAV.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+          const active = (pathname === item.href || pathname.startsWith(`${item.href}/`)) && !(item.href === "/templates" && pathname === "/templates/ai");
           return (
             <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined}
               className={cn("group flex h-8 items-center gap-2.5 rounded-md px-2 text-sm transition-colors",

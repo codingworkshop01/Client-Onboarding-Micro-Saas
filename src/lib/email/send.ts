@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { env } from "@/lib/env";
 import { createMagicLink } from "@/lib/requests";
 import { sendEmail, type SendResult } from "./provider";
-import { completedEmail, invitationEmail, reminderEmail } from "./templates";
+import { completedEmail, invitationEmail, reminderEmail, replyEmail } from "./templates";
 
 type Kind = "invitation" | "reminder" | "manual_reminder" | "completed" | "agency_alert";
 
@@ -76,4 +76,14 @@ export async function notifyAgencyCompleted(requestId: string) {
     const result = await sendEmail({ to, ...email });
     await log({ workspaceId: r.workspace_id, requestId, kind: "completed", recipient: to, subject: email.subject, result });
   }
+}
+
+/** Email the client when the agency replies in the comments thread. */
+export async function notifyClientOfReply(requestId: string, authorName: string, body: string) {
+  const r = await loadContext(requestId);
+  const link = await createMagicLink({ workspaceId: r.workspace_id, requestId });
+  const brand = { name: r.workspace.name, color: r.workspace.brand_color, logoUrl: r.workspace.logo_url };
+  const email = replyEmail({ brand, clientName: r.client.name, authorName, body, url: link.url, title: r.title });
+  const result = await sendEmail({ to: r.client.email, ...email, replyTo: r.workspace.support_email ?? undefined });
+  await log({ workspaceId: r.workspace_id, requestId, kind: "agency_alert", recipient: r.client.email, subject: email.subject, result });
 }

@@ -22,6 +22,7 @@ export function describeActivity(e: Pick<Event, "type" | "actor_name" | "payload
     case "access.confirmed": return `${who} confirmed access to ${p.platform}`;
     case "agreement.signed": return `${who} signed "${p.agreement}"`;
     case "payment.paid": return `${who} paid ${p.amount}`;
+    case "payment.recorded": return `${who} recorded an offline payment of ${p.amount}`;
     case "payment.failed": return `A payment by ${who} failed`;
     case "comment.created": return `${who} commented: “${String(p.preview ?? "").slice(0, 80)}”`;
     case "reminder.sent": return `Reminder sent to ${p.recipient}`;

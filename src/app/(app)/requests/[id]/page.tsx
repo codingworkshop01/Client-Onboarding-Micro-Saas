@@ -17,7 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RequestStatusBadge } from "@/components/app/status";
 import { StepTypeIcon } from "@/components/builder/step-icon";
 import { describeActivity } from "@/components/app/activity";
-import { RequestActions, ReopenStepButton } from "./request-actions";
+import { RecordPaymentButton, RequestActions, ReopenStepButton } from "./request-actions";
 import { DocumentRow } from "./document-review";
 import { CommentsThread } from "./comments-thread";
 import { ReminderSettings } from "./reminder-settings";
@@ -193,6 +193,8 @@ export default async function RequestPage({ params, searchParams }: { params: Pr
                               <Badge variant={pay?.status === "paid" ? "success" : pay?.status === "failed" ? "danger" : pay?.status === "pending" ? "warning" : "outline"} className="capitalize">{pay?.status ?? "unpaid"}</Badge>
                               {pay?.paid_at && <div className="mt-1 text-xs text-muted-foreground">{format(new Date(pay.paid_at), "MMM d, yyyy")}</div>}
                               {pay?.receipt_url && <a href={pay.receipt_url} target="_blank" rel="noreferrer" className="mt-1 block text-xs text-info hover:underline">Receipt</a>}
+                              {pay?.provider === "manual" && <div className="mt-1 text-xs text-muted-foreground">Recorded offline</div>}
+                              {pay?.status !== "paid" && r.status !== "cancelled" && <div className="mt-2"><RecordPaymentButton stepId={row.id} /></div>}
                             </div>
                           </div>
                         );

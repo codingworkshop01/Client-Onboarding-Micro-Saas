@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireWorkspace, displayName, canAdmin } from "@/lib/auth";
 import { stepsSchema } from "@/lib/flows/schema";
 import { createMagicLink, recomputeRequest, stepRowsFromTemplate } from "@/lib/requests";
-import { sendInvitation, sendReminder } from "@/lib/email/send";
+import { notifyClientOfReply, sendInvitation, sendReminder } from "@/lib/email/send";
 import { logActivity, audit } from "@/lib/activity";
 import { PLANS } from "@/lib/plans";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -281,6 +281,9 @@ export async function postAgencyComment(requestId: string, body: string): Promis
   const { error } = await supabase.from("comments").insert({ workspace_id: workspace.id, request_id: requestId, author_type: "member", author_id: user.id, author_name: displayName(profile), body: text.data });
   if (error) return { ok: false, error: "Couldn't post the comment" };
   await logActivity({ workspaceId: workspace.id, requestId, clientId: request.client_id, actorType: "member", actorId: user.id, actorName: displayName(profile), type: "comment.created", payload: { preview: text.data.slice(0, 120) } });
+  if (request.client && request.status !== "draft" && request.status !== "cancelled") {
+    await notifyClientOfReply(requestId, displayName(profile), text.data).catch((e) => console.error("reply email failed", e));
+  }
   revalidatePath(`/requests/${requestId}`);
   return { ok: true };
 }
@@ -289,4 +292,28 @@ export async function markCommentsRead(requestId: string) {
   const { supabase, workspace } = await requireWorkspace();
   await supabase.from("comments").update({ read_by_agency_at: new Date().toISOString() }).eq("request_id", uuid.parse(requestId)).eq("workspace_id", workspace.id).eq("author_type", "client").is("read_by_agency_at", null);
   revalidatePath("/", "layout");
+}
+
+/** Agency records a payment received outside Stripe (bank transfer, cash...). Clearly marked as manual. */
+export async function recordOfflinePayment(stepId: string, note: string): Promise<R> {
+  const ctx = await requireWorkspace();
+  if (!canAdmin(ctx.role)) return { ok: false, error: "Only owners and admins can record payments." };
+  const { data: step } = await ctx.supabase.from("request_steps").select("*, request:onboarding_requests(id, client_id)").eq("id", uuid.parse(stepId)).eq("workspace_id", ctx.workspace.id).single();
+  if (!step || step.type !== "payment") return { ok: false, error: "Payment step not found" };
+  const cfg = step.config as { amountCents: number; currency: string; description?: string };
+  const admin = createAdminClient();
+  const { data: existing } = await admin.from("payments").select("id").eq("step_id", step.id).eq("status", "paid").maybeSingle();
+  if (existing) return { ok: false, error: "This step is already paid." };
+  const memo = z.string().trim().max(200).parse(note || "");
+  const { data: pay, error } = await admin.from("payments").insert({
+    workspace_id: ctx.workspace.id, request_id: step.request_id, step_id: step.id, amount_cents: cfg.amountCents, currency: cfg.currency,
+    description: memo ? `${cfg.description ?? "Payment"} (offline: ${memo})` : `${cfg.description ?? "Payment"} (recorded offline)`,
+    status: "paid", provider: "manual", paid_at: new Date().toISOString(),
+  }).select("id").single();
+  if (error) return { ok: false, error: "Couldn't record the payment" };
+  await audit({ workspaceId: ctx.workspace.id, actorType: "member", actorId: ctx.user.id, action: "payment.recorded_offline", entityType: "payment", entityId: pay.id, metadata: { note: memo } });
+  await logActivity({ workspaceId: ctx.workspace.id, requestId: step.request_id, clientId: step.request?.client_id, actorType: "member", actorId: ctx.user.id, actorName: displayName(ctx.profile), type: "payment.recorded", payload: { amount: `${(cfg.amountCents / 100).toFixed(2)} ${cfg.currency.toUpperCase()}` } });
+  await recomputeRequest(step.request_id);
+  revalidatePath(`/requests/${step.request_id}`);
+  return { ok: true };
 }

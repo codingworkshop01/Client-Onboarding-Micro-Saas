@@ -56,3 +56,11 @@ export function completedEmail(input: { brand: Brand; clientName: string; title:
     html: layout(input.brand, paragraphs(`Good news: ${input.clientName} has completed every required step of "${input.title}".`), { label: "Review submission", url: input.url }),
   };
 }
+
+export function replyEmail(input: { brand: Brand; clientName: string; authorName: string; body: string; url: string; title: string }) {
+  return {
+    subject: `${input.authorName} replied: ${input.title}`,
+    text: `Hi ${input.clientName},\n\n${input.authorName} replied to your question:\n\n${input.body}\n\nView: ${input.url}`,
+    html: layout(input.brand, paragraphs(`Hi ${input.clientName},\n\n${input.authorName} replied to your question:\n\n${input.body}`), { label: "View conversation", url: input.url }),
+  };
+}
