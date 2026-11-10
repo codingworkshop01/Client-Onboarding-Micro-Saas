@@ -11,7 +11,7 @@ A client onboarding SaaS for agencies and freelancers. Send a client one branded
 | Area | Status |
 |---|---|
 | Auth: sign up, sign in, sign out, password reset | ✅ Supabase Auth |
-| Workspaces: owner/admin/member roles, branding, logo upload, workspace switcher | ✅ |
+| Workspaces: owner/admin/member roles, team invitations, branding, logo upload, workspace switcher | ✅ |
 | Dashboard: stats, completion rate, overdue, needs-attention, activity feed, ⌘K search | ✅ |
 | Flow builder: 5 step types, drag-to-reorder, duplicate, required/optional, live client preview | ✅ |
 | Smart forms: 11 field types, conditional logic (chained), validation, autosave | ✅ |
@@ -187,7 +187,7 @@ pnpm lint
 
 Built so these can be added without restructuring:
 
-- Team invitations and assignments
+- Team assignments (invitations, roles and removal are done)
 - Google Drive export
 - Encrypted credential vault
 - WhatsApp/SMS reminders

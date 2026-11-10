@@ -64,3 +64,12 @@ export function replyEmail(input: { brand: Brand; clientName: string; authorName
     html: layout(input.brand, paragraphs(`Hi ${input.clientName},\n\n${input.authorName} replied to your question:\n\n${input.body}`), { label: "View conversation", url: input.url }),
   };
 }
+
+export function teamInviteEmail(input: { brand: Brand; inviterName: string; role: string; url: string; appName: string }) {
+  const body = `${input.inviterName} invited you to join ${input.brand.name} on ${input.appName} as ${input.role === "admin" ? "an admin" : "a team member"}.\n\nYou'll be able to create and manage client onboardings together. This invitation expires in 7 days.`;
+  return {
+    subject: `Join ${input.brand.name} on ${input.appName}`,
+    text: `${body}\n\nAccept: ${input.url}`,
+    html: layout(input.brand, paragraphs(body), { label: "Accept invitation", url: input.url }),
+  };
+}

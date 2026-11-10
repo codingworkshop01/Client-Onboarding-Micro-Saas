@@ -32,7 +32,8 @@ export async function updateSession(request: NextRequest) {
   }
   if (user && AUTH_PAGES.includes(path)) {
     const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    const next = request.nextUrl.searchParams.get("next") ?? "";
+    url.pathname = next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
     url.search = "";
     return NextResponse.redirect(url);
   }

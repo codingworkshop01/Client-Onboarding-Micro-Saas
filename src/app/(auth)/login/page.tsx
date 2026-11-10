@@ -17,7 +17,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           { name: "email", label: "Email", type: "email", autoComplete: "email", placeholder: "you@agency.com" },
           { name: "password", label: "Password", type: "password", autoComplete: "current-password", hint: <Link href="/forgot-password" className="text-[13px] font-normal text-muted-foreground hover:text-foreground">Forgot password?</Link> },
         ]}
-        footer={<>New here? <Link href="/signup" className="font-medium text-foreground hover:underline">Create an account</Link></>}
+        footer={<>New here? <Link href={next ? `/signup?next=${encodeURIComponent(next)}` : "/signup"} className="font-medium text-foreground hover:underline">Create an account</Link></>}
       />
     </>
   );

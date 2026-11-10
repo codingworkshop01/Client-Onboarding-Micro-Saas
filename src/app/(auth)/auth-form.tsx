@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
 import type { AuthState } from "./actions";
 
-type FieldDef = { name: string; label: string; type?: string; autoComplete?: string; placeholder?: string; hint?: React.ReactNode };
+type FieldDef = { name: string; label: string; type?: string; autoComplete?: string; placeholder?: string; hint?: React.ReactNode; defaultValue?: string };
 
 export function AuthForm({ action, fields, submitLabel, next, footer }: {
   action: (s: AuthState, f: FormData) => Promise<AuthState>;
@@ -34,7 +34,7 @@ export function AuthForm({ action, fields, submitLabel, next, footer }: {
         const err = state?.fieldErrors?.[f.name]?.[0];
         return (
           <Field key={f.name} label={<span className="flex w-full items-center justify-between">{f.label}{f.hint}</span>} htmlFor={f.name} error={err}>
-            <Input id={f.name} name={f.name} type={f.type ?? "text"} autoComplete={f.autoComplete} placeholder={f.placeholder} aria-invalid={!!err} aria-describedby={err ? `${f.name}-error` : undefined} className="h-10" />
+            <Input id={f.name} name={f.name} type={f.type ?? "text"} autoComplete={f.autoComplete} placeholder={f.placeholder} defaultValue={f.defaultValue} aria-invalid={!!err} aria-describedby={err ? `${f.name}-error` : undefined} className="h-10" />
           </Field>
         );
       })}

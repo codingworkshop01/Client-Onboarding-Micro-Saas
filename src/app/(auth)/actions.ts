@@ -15,6 +15,12 @@ function safeNext(next: FormDataEntryValue | null) {
   return n.startsWith("/") && !n.startsWith("//") ? n : "/dashboard";
 }
 
+/** After sign-up: an invite link if one was passed, otherwise workspace setup. */
+function nextAfterSignup(next: FormDataEntryValue | null) {
+  const n = typeof next === "string" ? next : "";
+  return /^\/invite\/[A-Za-z0-9_-]{40,60}$/.test(n) ? n : "/onboarding";
+}
+
 export async function signIn(_: AuthState, form: FormData): Promise<AuthState> {
   const parsed = z.object({ email, password: z.string().min(1, "Enter your password") }).safeParse({
     email: form.get("email"),
@@ -46,11 +52,11 @@ export async function signUp(_: AuthState, form: FormData): Promise<AuthState> {
   const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
-    options: { data: { full_name: parsed.data.fullName }, emailRedirectTo: `${env.appUrl}/auth/callback?next=/onboarding` },
+    options: { data: { full_name: parsed.data.fullName }, emailRedirectTo: `${env.appUrl}/auth/callback?next=${encodeURIComponent(nextAfterSignup(form.get("next")))}` },
   });
   if (error) return { error: error.message };
   if (!data.session) return { message: "Check your inbox to confirm your email, then sign in." };
-  redirect("/onboarding");
+  redirect(nextAfterSignup(form.get("next")));
 }
 
 export async function requestPasswordReset(_: AuthState, form: FormData): Promise<AuthState> {

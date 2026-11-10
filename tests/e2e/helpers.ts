@@ -1,6 +1,16 @@
 import { expect, type Page } from "@playwright/test";
+import { createClient } from "@supabase/supabase-js";
+
+/** The suite creates many accounts from one IP; clear the local sign-up rate-limit counter first. */
+export async function resetSignupLimit() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key || !/127\.0\.0\.1|localhost/.test(url)) return;
+  await createClient(url, key, { auth: { persistSession: false } }).from("rate_limits").delete().like("key", "signup:%");
+}
 
 export async function signUpAgency(page: Page, opts: { name?: string; workspace?: string } = {}) {
+  await resetSignupLimit();
   const email = `e2e-${Date.now()}-${Math.random().toString(36).slice(2, 7)}@example.com`;
   await page.goto("/signup");
   await page.fill("#fullName", opts.name ?? "Test Owner");
