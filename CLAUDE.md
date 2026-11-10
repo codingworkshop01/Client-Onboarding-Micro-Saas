@@ -113,9 +113,9 @@ uploads files, grants account access, signs an agreement and pays.
   line 25 of `/etc/hablu-env.conf`); SMTP is Gmail `smtp.gmail.com:465` (login accepted); real sign-up ->
   confirmation email -> confirm -> password-reset email -> sign-in -> workspace -> file upload (bucket
   `branding`, on disk in `data/storage`) all worked.
-- **Note:** the installed `hablu-env` recreates only `app`. GoTrue (`auth`) also reads `SMTP_*`, so after changing
-  those run `docker compose -p hablu-onboarding up -d --no-deps auth` in the install dir. Once the owner deploys the
-  OPS files (section 7), the conf line has `companion=auth` and hablu-env recreates `app` + `auth` itself.
+- **hablu-env:** `hablu-env set|add onboarding KEY` recreates `app` + `auth` (conf option `companion=auth`, since
+  GoTrue also reads `SMTP_*`). Keys that only `cron` reads (`CRON_SECRET`) also need
+  `docker compose -p hablu-onboarding up -d --no-deps cron` in the install dir.
 - **Rollback verified on the real host (2026-11-10):** `-Sha a16811b` then `-Sha e398e3c`, 11-12 s each;
   image reused (no build), 0 migrations, only `app` recreated; user, workspace and file intact.
 - **`GOTRUE_MAILER_EXTERNAL_HOSTS=${APP_DOMAIN}`** (5bb19bb): auth's repeated "external host not added" log line is gone.
@@ -135,17 +135,21 @@ uploads files, grants account access, signs an agreement and pays.
     4. `docker compose -p hablu-onboarding up -d --no-deps auth rest storage app cron`, then check `/healthz`.
     `roles-<ts>.sql` is only needed on a brand-new server (existing roles error harmlessly).
   - `hablu-docker-gc` only prunes dangling images, so the tagged rollback images are safe.
+- **OPS host layer deployed (2026-11-10)** from `D:\codes\work\hablu\hablu-programmer\ops\vps-panel` with
+  `pwsh -File .\deploy.ps1 -HostLayer -NoBuild` (panel sources were byte-identical, so no panel rebuild; no
+  container restarted). Changed files (originals in `.orig-2026-11-10/` there):
+  - `host/hablu-env.conf`: `onboarding` line with `companion=auth` (the OPS repo copy must keep this line, because
+    `install-host.sh` replaces `/etc/hablu-env.conf` with it);
+  - `host/hablu-env`: doctor `find` roots include `/srv/apps`; selftest expects 7 projects;
+  - `host/hablu-env-uninstall`: `ENV_DIRS` includes `/srv/apps/ai-client-onboarding`;
+  - `host/hablu-status`: compose project list includes `/srv/apps/ai-client-onboarding`.
+  This also installed the OPS repo's newer `hablu-env` (`companion=` option; `support` now uses
+  `companion=access-email-worker`). Previous conf: `/etc/hablu-env.conf.bak-20261110T155828Z`.
+  Verified: `hablu-env selftest` 45/0, doctor 0 failed. Onboarding's doctor warnings are expected: 7 optional keys
+  MISSING, and `JWT_SECRET DIFF` (onboarding must NOT share the Hablu apps' JWT secret).
+  There is no "config-backup" tool anywhere; `.env` + `compose.yaml` are covered by `backup.sh` instead.
 - **UNVERIFIED / missing:** off-server copies of the backups (same disk as the data; needs a destination the owner
-  chooses); the OPS-file changes are made locally but not deployed.
+  chooses).
 
 ## 7. Next steps (owner runs host commands; verify each with real output)
-1. Owner: deploy the OPS host layer from `D:\codes\work\hablu\hablu-programmer\ops\vps-panel`
-   (`pwsh -File .\deploy.ps1 -HostLayer`). Changed on 2026-11-10 (originals in `.orig-2026-11-10/`):
-   - `host/hablu-env.conf`: `onboarding` line with `companion=auth` (without it, install-host.sh would drop the line);
-   - `host/hablu-env`: doctor `find` roots include `/srv/apps`; selftest expects 7 projects;
-   - `host/hablu-env-uninstall`: `ENV_DIRS` includes `/srv/apps/ai-client-onboarding`;
-   - `host/hablu-status`: compose project list includes `/srv/apps/ai-client-onboarding`.
-   This also installs the OPS repo's newer, not-yet-deployed `hablu-env` (the `companion=` option, used by `support` too).
-   There is no "config-backup" tool anywhere; `.env` + `compose.yaml` are covered by `backup.sh` instead.
-   After deploy: `hablu-env selftest` -> 45 passed, 0 failed (the installed version fails 1 check since the 7th project).
-2. Later: off-server backup copies (S3 / Google Drive / another host), owner's choice of destination.
+1. Later: off-server backup copies (S3 / Google Drive / another host), owner's choice of destination.
