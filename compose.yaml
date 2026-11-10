@@ -39,6 +39,7 @@ services:
       - ./data/db:/var/lib/postgresql/data
       # Named volume (not a bind mount): it must start with the image's own files.
       - db-config:/etc/postgresql-custom
+      - ./app/deploy/supabase/db/webhooks.sql:/docker-entrypoint-initdb.d/init-scripts/98-webhooks.sql:ro
       - ./app/deploy/supabase/db/roles.sql:/docker-entrypoint-initdb.d/init-scripts/99-roles.sql:ro
       - ./app/deploy/supabase/db/jwt.sql:/docker-entrypoint-initdb.d/init-scripts/99-jwt.sql:ro
     healthcheck:
